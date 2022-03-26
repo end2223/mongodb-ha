@@ -21,7 +21,7 @@ spec:
         env: {{ .Values.labels.env }}
         app: {{ .Values.labels.app }}
     containers:
-    - name: {{ .Values.appName }}
+    - name: {{ .Values.containerName }}
       image: {{ .Values.pod.container.image }}
       ports:
       {{- range .Values.service.ports }}
