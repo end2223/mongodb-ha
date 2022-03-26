@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ Values.appName }}-configmap-bin
+  name: {{ .Values.appName }}-configmap-bin
 data:
   {{- (.Files.Glob .Values.config.bin).AsConfig | nindent 2 }}
 

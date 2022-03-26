@@ -1,35 +1,34 @@
-appName:
-
+appName: mongodb
 labels:
-  app:
-  env:
-  project:
+  app: vocs
+  env: test
+  project: versioning-management
 pod:
-  replica: 3
+  replicas: 3
   labels:
   container:
-    containerName:
-    image:
+    containerName: mongodb
+    image: mongodb
     tag:
     volumes:
-    - name: Use for etc
-      mountPath: /data/etc
-      mode: 0777
-    - name: Use for bin
-      mountPath: /data/bin
-      mode: 0777
-    - name: Use for save data of mongodb
-      mountPath:
-      mode: 0777
+      etc:
+        mountPath: /data/etc
+        mode: 0777
+      bin:
+        mountPath: /data/bin
+        mode: 0777
+      data:
+        mountPath: /data
+        mode: 0777
   volumeClaimTemplates:
-  - storage: 200Mi
-    accessModes: ["ReadWriteOnce"]
+    storage: 200Mi
+    accessModes: ['"ReadWriteOnce"']
     storageClassName: host-path
 service:
   selector:
-    app:
-    env:
-    project:
+    app: vocs
+    env: test
+    project: versioning-management
   clusterIP: Node # headless port for statefulset
   publishNotReadyAddresses: true
   ports:
@@ -39,16 +38,16 @@ service:
     protocol: TCP
 
 config:
-  bin: config/bin
-  etc: config/etc
+  bin: config/bin/**
+  etc: config/etc/**
 
 secret:
   # base64 => run command: echo -n "my-database" | base64
   # Commonly, You shouldn't create secret with yaml file. You should use command line that is support by kubectl
-  databaseName:
-  adminUser:
-  adminPassword:
-  replicaUser:
-  replicaPassword:
+  databaseName: dmVyc2lvbi1tYW5hZ2VtZW50
+  adminUser: dm9jcy1hZG1pbg==
+  adminPassword: dm9jcy1hZG1pbg==
+  replicaUser: dm9jcy1yZXBsaWNh
+  replicaPassword: dm9jcy1yZXBsaWNh
   # because every Pod need a little time for initial process pod.
   timeBeforeInitPrimaryKeyNode: 30

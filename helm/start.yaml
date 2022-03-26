@@ -1,0 +1,286 @@
+NAME: mongodb-ha
+LAST DEPLOYED: Sun Mar 27 01:33:49 2022
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: mongodb-ha/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "mongodb-ha-test-connection"
+  labels:
+    helm.sh/chart: mongodb-ha-0.1.0
+    app.kubernetes.io/name: mongodb-ha
+    app.kubernetes.io/instance: mongodb-ha
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['mongodb-ha:']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: mongodb-ha/templates/secret-env.yaml
+apiVersion: v1
+kind: Secret
+metadata: 
+  name: mongodb-secret-env
+data:
+  DATABASE_NAME: dmVyc2lvbi1tYW5hZ2VtZW50 
+  ADMIN_USER: dm9jcy1hZG1pbg==
+  ADMIN_PASSWORD: dm9jcy1hZG1pbg==
+  REPLICA_USER: dm9jcy1yZXBsaWNh
+  REPLICA_PASSWORD: dm9jcy1yZXBsaWNh
+  TIMESTART: 30
+---
+# Source: mongodb-ha/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-configmap-bin
+data:
+  start.sh: |-
+    #!/bin/bash
+    sleep 30
+    /data/etc/gen-config-replica.sh
+    mongo < /data/etc/create-replica.js
+    mongo < /data/etc/setup-account.js
+    mongo -u $REPLICA_USER -p $REPLICA_PASSWORD --eval "rs.status()" --authenticationDatabase $DATABASE_NAME
+---
+# Source: mongodb-ha/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-configmap-etc
+data:
+  create-replica.js: rs.initiate(__CONFIG)
+  gen-config-replica.sh: |-
+    #!/bin/bash
+  
+    # generate config for replica
+    replica=""
+    for ((i=0; i<$NUMBER_REPLICA; i++)); do
+      replica="$replica{\"_id\": \"$i\", \"host\": \"mongodb-$i:27017\"}, "
+    done;
+    replica="{\"_id\": \"$REPLICA_CLUSTER\", \"members\": [${replica%,*}]}"
+  
+    # update create replica script
+    sed -i "s/__CONFIG/$replica/" create-replica.js
+  
+    # update create account admin, cluster
+    sed -i "s/__database_name/$DATABASE_NAME/g" setup-account.js
+    sed -i "s/__admin_user/$ADMIN_USER/g" setup-account.js
+    sed -i "s/__admin_password/$ADMIN_PASSWORD/g" setup-account.js
+    sed -i "s/__replica_user/$REPLICA_USER/g" setup-account.js
+    sed -i "s/__replica_password/$REPLICA_PASSWORD/g" setup-account.js
+  
+  
+    # admin = db.getSiblingDB("__database_name")
+    # admin.createUser(
+    #   {
+    #     user: "__admin_user",
+    #     pwd: "__admin_password",
+    #     roles: [ { role: "userAdminAnyDatabase", db: "__database_name" } ]
+    #   }
+    # )// let's authenticate to create the other user
+    # db.getSiblingDB("__database_name").auth("__admin_user", "__admin_password" )
+    # db.getSiblingDB("__database_name").createUser(
+    #   {
+    #     "user" : "__replica_user",
+    #     "pwd" : "__replica_password",
+    #     roles: [ { "role" : "clusterAdmin", "__replica_user" : "__replica_password" } ]
+    #   }
+    # )
+  gen-keyfile.sh: openssl rand -base64 741 > mongo-keyfile
+  mongo-keyfile: |
+    Czt2J5bzM3J0D/rnJar0EP1zSsABuzS7JRbfa+x64S0HVCxBYKLAkb3ZDO3Z9UNx
+    VllZEKlvnkpiz7BsjMOVemgd+Q/O2WROdb3iZVmw7ZwGacw66FCp+m8LB/oZAxbC
+    CJ7gvUgBaUHZ2Zzg9vN3O+ExQtNLoxQgwS0OVw7lhYKhsW2NUQyISYLmBOWNIylV
+    9zJpw1LNXQ/RohrnHfT6gadwmZLxQRCx6zC3yKc+buqVsBBVRJ9mHUoxq99ft23Q
+    EsWhmoC9jBFsXxFIzYe88Gz0aGlLAR65bygcgbgu14CjLEHD8B+/Q02WAZLZr/Oo
+    ltKXpwxyZy9GExiYuK+DmrWJ6MT0DuUrXTCYl5EbRI1kIiz2JkvEn6yT4bLTJoZs
+    R5od6A+val4Uq8U8d8JXLLt/dBpkWsr/ywFPA976keyBfg8Kg3GmguKM8Xy6p7CO
+    FFdXWCUJPRJUNnO8J85e5eqY0iv9xqhktN7yPY2VR//TGP9cVTm0zBNBvBN0c/0w
+    NvJrPl/wCiWGsRu8AvIGz4+UMmkXkIzEDZuowtX/GQQCOn+NQ1kI7RmF/t/Mn7KF
+    WA677sqI/+ODA6SL2UkGm5nkhUy4FXP2RHzbkWm5Oxsex5FJI2ye4pn85ifLBeUT
+    kWB93gqjwzGQU7o5hJeCFVdmmdHvBq6JVDI3EY5kyVmxxXPOG49jigUAPypCQL1h
+    PF98aNLmgstOzVyffK6PKR1rlJh60TDYw1/kOM6TfUTkSOrdIaBVWZ8z2ixiieiJ
+    nPfeiZrNjc8ZZwTVUmKHGJNGzHZTJ9XOaoD1CubKlmeNoe/gOYLUh5KArSotrvcb
+    dxC/u2KfM4AuBe6TIM2e+Mt5H1erydHX1kRl/vWUALaCkFLUTAd8nXXgFIJrFNke
+    XDh0R9BFj3USXlGJtzlT4AStMEP56ORllLQoITjbWddkg1YpROcqiJ3u1ST3fNtV
+    OxyV5KbImqPBRbXXswIC8h1fAked
+  setup-account.js: |-
+    admin = db.getSiblingDB("__database_name")
+    admin.createUser(
+      {
+        user: "__admin_user",
+        pwd: "__admin_password",
+        roles: [ { role: "userAdminAnyDatabase", db: "__database_name" } ]
+      }
+    )// let's authenticate to create the other user
+    db.getSiblingDB("__database_name").auth("__admin_user", "__admin_password" )
+    db.getSiblingDB("__database_name").createUser(
+      {
+        "user" : "__replica_user",
+        "pwd" : "__replica_password",
+        roles: [ { "role" : "clusterAdmin", "__replica_user" : "__replica_password" } ]
+      }
+    )
+---
+# Source: mongodb-ha/templates/persistent-volume.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb-pv-0
+spec:
+  capacity:
+    storage: 200Mi
+  storageClassName: host-path
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /data/mongodb/pv-0
+---
+# Source: mongodb-ha/templates/persistent-volume.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb-pv-1
+spec:
+  capacity:
+    storage: 200Mi
+  storageClassName: host-path
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /data/mongodb/pv-1
+---
+# Source: mongodb-ha/templates/persistent-volume.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb-pv-2
+spec:
+  capacity:
+    storage: 200Mi
+  storageClassName: host-path
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /data/mongodb/pv-2
+---
+# Source: mongodb-ha/templates/service-mongodb.yaml
+apiVersion: v1 
+kind: Service
+metadata:
+  name: mongodb-service
+spec:
+  clusterIP: Node
+  publishNotReadyAddresses: true
+  selector:
+    app: vocs
+    env: test
+    project: versioning-management
+  ports:
+  - name: mongodb
+    protocol: TCP
+    port: 21017
+    targetPort: 27017
+---
+# Source: mongodb-ha/templates/stateful-set-mongodb.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb-stateful-set
+  labels:
+    project: versioning-management
+    env: test
+    app: vocs
+spec:
+  serviceName: mongodb-service
+  replicas: 
+  selector: 
+    matchLabels:
+      project: versioning-management
+      env: test
+      app: vocs
+  template:
+    metadata:
+      labels:
+        project: versioning-management
+        env: test
+        app: vocs
+    spec:
+      containers:
+      - name: mongodb
+        image: mongodb
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongodb-etc
+          mountPath: /data/etc
+        - name: mongodb-bin
+          mountPath: /data/bin
+        - name: mongodb-data
+          mountPath: /data
+        env:
+          - name: ADMIN_USER
+            valueFrom:
+              secretKeyRef:
+                name: mongodb-secret-env
+                key: ADMIN_USER
+          - name: ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: mongodb-secret-env
+                key: ADMIN_PASSWORD
+          - name: REPLICA_USER
+            valueFrom:
+              secretKeyRef:
+                name: mongodb-secret-env
+                key: REPLICA_USER
+          - name: REPLICA_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: mongodb-secret-env
+                key: REPLICA_PASSWORD
+          - name: DATABASE_NAME
+            valueFrom:
+              secretKeyRef:
+                name: mongodb-secret-env
+                key: DATABASE_NAME
+          - name: TIMESTART
+            valueFrom:
+              secretKeyRef:
+                name: mongodb-secret-env
+                key: TIMESTART
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+      volumes:
+      - name: mongodb-etc
+        configMap:
+          name: mongodb-configmap-etc
+          defaultMode: 511
+      - name: mongodb-bin
+        configMap:
+          name: mongodb-configmap-bin
+          defaultMode: 511
+  volumeClaimTemplates:
+  - metadata:
+      name: mongodb-data
+    spec:
+      resources:
+        requests:
+          storage: 200Mi
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: host-path
+
