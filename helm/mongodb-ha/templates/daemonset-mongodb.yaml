@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.appName }}-stateful-set
+  labels:
+    project: {{ .Values.labels.project }}
+    env: {{ .Values.labels.env }}
+    app: {{ .Values.labels.app }}
+spec:
+  serviceName: {{ .Values.appName }}-service
+  replica: {{ .Values.pod.replica }}
+  selector: 
+    matchLabels:
+      project: {{ .Values.labels.project }}
+      env: {{ .Values.labels.env }}
+      app: {{ .Values.labels.app }}
+  template:
+    metadata:
+      labels:
+        project: {{ .Values.labels.project }}
+        env: {{ .Values.labels.env }}
+        app: {{ .Values.labels.app }}
+    containers:
+    - name: {{ .Values.appName }}
+      image: {{ .Values.pod.container.image }}
+      ports:
+      {{- range .Values.service.ports }}
+      - containerPort: {{ .targetPort }}
+      {{- end }}
+      volumeMounts:
+      - name: {{ .Values.appName }}-etc
+        mountPath: {{ .Values.pod.container.volumes[0].mountPath }}
+      - name: {{ .Values.appName }}-bin
+        mountPath: {{ .Values.pod.container.volumes[1].mountPath }}
+      - name: {{ .Values.appName }}-data
+        mountPath: {{ .Values.pod.container.volumes[2].mountPath }}
+      env:
+        - name: ADMIN_USER
+          valueFrom:
+            secetKeyRef:
+              name: {{ .Values.appName }}-secret-env
+              key: ADMIN_USER
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secetKeyRef:
+              name: {{ .Values.appName }}-secret-env
+              key: ADMIN_PASSWORD
+        - name: REPLICA_USER
+          valueFrom:
+            secetKeyRef:
+              name: {{ .Values.appName }}-secret-env
+              key: REPLICA_USER
+        - name: REPLICA_PASSWORD
+          valueFrom:
+            secetKeyRef:
+              name: {{ .Values.appName }}-secret-env
+              key: REPLICA_PASSWORD
+        - name: DATABASE_NAME
+          valueFrom:
+            secetKeyRef:
+              name: {{ .Values.appName }}-secret-env
+              key: DATABASE_NAME
+        - name: TIMESTART
+          valueFrom:
+            secetKeyRef:
+              name: {{ .Values.appName }}-secret-env
+              key: TIMESTART
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+    volumes:
+    - name: {{ .Values.appName }}-etc
+      configMap:
+        name: {{ .Values.appName }}-configmap-etc
+        defaultMode: {{ .Values.pod.container.volumes[0].mode }}
+    - name: {{ .Values.appName }}-bin
+      configMap:
+        name: {{ .Values.appName }}-configmap-bin
+        defaultMode: {{ .Values.pod.container.volumes[1].mode }}
+  volumeClaimTemplates:
+  - metadata:
+      name: {{ .Values.appName }}-data
+    spec:
+      resources:
+        requests:
+          storage: {{ .Values.volumeClaimTemplates[0].storage }}
+      accessModes: {{ .Values.volumeClaimTemplates[0].accessModes }}
+      storageClassName: {{ .Values.volumeClaimTemplates[0].storageClassName }}
+      
