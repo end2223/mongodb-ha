@@ -8,7 +8,7 @@ pod:
   labels:
   container:
     containerName: mongodb
-    image: mongodb
+    image: mongo
     tag:
     volumes:
       etc:
@@ -18,7 +18,7 @@ pod:
         mountPath: /data/bin
         mode: 0777
       data:
-        mountPath: /data
+        mountPath: /data/db
         mode: 0777
   volumeClaimTemplates:
     storage: 200Mi
@@ -29,7 +29,7 @@ service:
     app: vocs
     env: test
     project: versioning-management
-  clusterIP: Node # headless port for statefulset
+  clusterIP: None # headless port for statefulset
   publishNotReadyAddresses: true
   ports:
   - name: mongodb
@@ -50,4 +50,7 @@ secret:
   replicaUser: dm9jcy1yZXBsaWNh
   replicaPassword: dm9jcy1yZXBsaWNh
   # because every Pod need a little time for initial process pod.
-  timeBeforeInitPrimaryKeyNode: 30
+  timeBeforeInitPrimaryKeyNode: MzA=
+  # Name of replica cluster
+  REPLICA_CLUSTER: bW9uZ29kYi1jbHVzdGVy
+  NUMBER_REPLICA: Mw== # equal pod.replicas

@@ -1,5 +1,5 @@
 NAME: mongodb-ha
-LAST DEPLOYED: Sun Mar 27 01:33:49 2022
+LAST DEPLOYED: Sun Mar 27 15:01:22 2022
 NAMESPACE: default
 STATUS: pending-install
 REVISION: 1
@@ -38,7 +38,9 @@ data:
   ADMIN_PASSWORD: dm9jcy1hZG1pbg==
   REPLICA_USER: dm9jcy1yZXBsaWNh
   REPLICA_PASSWORD: dm9jcy1yZXBsaWNh
-  TIMESTART: 30
+  TIMESTART: MzA=
+  REPLICA_CLUSTER: bW9uZ29kYi1jbHVzdGVy
+  NUMBER_REPLICA: Mw==
 ---
 # Source: mongodb-ha/templates/configmap.yaml
 apiVersion: v1
@@ -48,11 +50,16 @@ metadata:
 data:
   start.sh: |-
     #!/bin/bash
-    sleep 30
-    /data/etc/gen-config-replica.sh
-    mongo < /data/etc/create-replica.js
-    mongo < /data/etc/setup-account.js
-    mongo -u $REPLICA_USER -p $REPLICA_PASSWORD --eval "rs.status()" --authenticationDatabase $DATABASE_NAME
+    /usr/local/bin/docker-entrypoint.sh mongod --replSet "$REPLICA_CLUSTER" &> /dev/null &
+    sleep 10
+    if [[ "$POD_NAME" -eq "mongodb-stateful-set-0" ]]
+    then
+        sleep 120
+        /data/etc/gen-config-replica.sh
+        mongo < /data/etc/create-replica.js
+        mongo < /data/etc/setup-account.js
+        mongo -u $REPLICA_USER -p $REPLICA_PASSWORD --eval "rs.status()" --authenticationDatabase $DATABASE_NAME
+    fi
 ---
 # Source: mongodb-ha/templates/configmap.yaml
 apiVersion: v1
@@ -67,7 +74,7 @@ data:
     # generate config for replica
     replica=""
     for ((i=0; i<$NUMBER_REPLICA; i++)); do
-      replica="$replica{\"_id\": \"$i\", \"host\": \"mongodb-$i:27017\"}, "
+      replica="$replica{\"_id\": $i, \"host\": \"mongodb-stateful-set-$i.mongodb-service:27017\"}, "
     done;
     replica="{\"_id\": \"$REPLICA_CLUSTER\", \"members\": [${replica%,*}]}"
   
@@ -80,24 +87,6 @@ data:
     sed -i "s/__admin_password/$ADMIN_PASSWORD/g" setup-account.js
     sed -i "s/__replica_user/$REPLICA_USER/g" setup-account.js
     sed -i "s/__replica_password/$REPLICA_PASSWORD/g" setup-account.js
-  
-  
-    # admin = db.getSiblingDB("__database_name")
-    # admin.createUser(
-    #   {
-    #     user: "__admin_user",
-    #     pwd: "__admin_password",
-    #     roles: [ { role: "userAdminAnyDatabase", db: "__database_name" } ]
-    #   }
-    # )// let's authenticate to create the other user
-    # db.getSiblingDB("__database_name").auth("__admin_user", "__admin_password" )
-    # db.getSiblingDB("__database_name").createUser(
-    #   {
-    #     "user" : "__replica_user",
-    #     "pwd" : "__replica_password",
-    #     roles: [ { "role" : "clusterAdmin", "__replica_user" : "__replica_password" } ]
-    #   }
-    # )
   gen-keyfile.sh: openssl rand -base64 741 > mongo-keyfile
   mongo-keyfile: |
     Czt2J5bzM3J0D/rnJar0EP1zSsABuzS7JRbfa+x64S0HVCxBYKLAkb3ZDO3Z9UNx
@@ -182,7 +171,7 @@ kind: Service
 metadata:
   name: mongodb-service
 spec:
-  clusterIP: Node
+  clusterIP: None
   publishNotReadyAddresses: true
   selector:
     app: vocs
@@ -205,7 +194,7 @@ metadata:
     app: vocs
 spec:
   serviceName: mongodb-service
-  replicas: 
+  replicas: 3
   selector: 
     matchLabels:
       project: versioning-management
@@ -220,7 +209,7 @@ spec:
     spec:
       containers:
       - name: mongodb
-        image: mongodb
+        image: mongo
         ports:
         - containerPort: 27017
         volumeMounts:
@@ -229,7 +218,8 @@ spec:
         - name: mongodb-bin
           mountPath: /data/bin
         - name: mongodb-data
-          mountPath: /data
+          mountPath: /data/db
+        command: ["sleep", "3000"]
         env:
           - name: ADMIN_USER
             valueFrom:
@@ -256,6 +246,11 @@ spec:
               secretKeyRef:
                 name: mongodb-secret-env
                 key: DATABASE_NAME
+          - name: MONGO_INITDB_DATABASE
+            valueFrom:
+              secretKeyRef:
+                name: mongodb-secret-env
+                key: DATABASE_NAME
           - name: TIMESTART
             valueFrom:
               secretKeyRef:
@@ -265,6 +260,16 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+          - name: REPLICA_CLUSTER
+            valueFrom:
+              secretKeyRef:
+                name: mongodb-secret-env
+                key: REPLICA_CLUSTER
+          - name: NUMBER_REPLICA
+            valueFrom:
+              secretKeyRef:
+                name: mongodb-secret-env
+                key: NUMBER_REPLICA
       volumes:
       - name: mongodb-etc
         configMap:
