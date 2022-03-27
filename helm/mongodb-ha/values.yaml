@@ -44,7 +44,7 @@ config:
 secret:
   # base64 => run command: echo -n "my-database" | base64
   # Commonly, You shouldn't create secret with yaml file. You should use command line that is support by kubectl
-  databaseName: dmVyc2lvbi1tYW5hZ2VtZW50
+  databaseName: YWRtaW4=
   adminUser: dm9jcy1hZG1pbg==
   adminPassword: dm9jcy1hZG1pbg==
   replicaUser: dm9jcy1yZXBsaWNh

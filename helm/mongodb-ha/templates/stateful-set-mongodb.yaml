@@ -35,7 +35,7 @@ spec:
           mountPath: {{ .Values.pod.container.volumes.bin.mountPath }}
         - name: {{ .Values.appName }}-data
           mountPath: {{ .Values.pod.container.volumes.data.mountPath }}
-        command: ["sleep", "3000"]
+        command: ["/data-777/bin/start.sh"]
         env:
           - name: ADMIN_USER
             valueFrom:

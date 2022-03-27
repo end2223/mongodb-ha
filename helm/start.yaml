@@ -1,5 +1,5 @@
 NAME: mongodb-ha
-LAST DEPLOYED: Sun Mar 27 15:01:22 2022
+LAST DEPLOYED: Sun Mar 27 23:58:46 2022
 NAMESPACE: default
 STATUS: pending-install
 REVISION: 1
@@ -33,7 +33,7 @@ kind: Secret
 metadata: 
   name: mongodb-secret-env
 data:
-  DATABASE_NAME: dmVyc2lvbi1tYW5hZ2VtZW50 
+  DATABASE_NAME: YWRtaW4= 
   ADMIN_USER: dm9jcy1hZG1pbg==
   ADMIN_PASSWORD: dm9jcy1hZG1pbg==
   REPLICA_USER: dm9jcy1yZXBsaWNh
@@ -52,14 +52,17 @@ data:
     #!/bin/bash
     /usr/local/bin/docker-entrypoint.sh mongod --replSet "$REPLICA_CLUSTER" &> /dev/null &
     sleep 10
+    cp -r /data /data-777
     if [[ "$POD_NAME" -eq "mongodb-stateful-set-0" ]]
     then
         sleep 120
-        /data/etc/gen-config-replica.sh
-        mongo < /data/etc/create-replica.js
-        mongo < /data/etc/setup-account.js
+        /data-777/etc/gen-config-replica.sh
+        mongo < /data-777/etc/create-replica.js
+        mongo < /data/-777etc/setup-account.js
         mongo -u $REPLICA_USER -p $REPLICA_PASSWORD --eval "rs.status()" --authenticationDatabase $DATABASE_NAME
     fi
+  
+    tail -f /dev/null
 ---
 # Source: mongodb-ha/templates/configmap.yaml
 apiVersion: v1
@@ -82,11 +85,11 @@ data:
     sed -i "s/__CONFIG/$replica/" create-replica.js
   
     # update create account admin, cluster
-    sed -i "s/__database_name/$DATABASE_NAME/g" setup-account.js
-    sed -i "s/__admin_user/$ADMIN_USER/g" setup-account.js
-    sed -i "s/__admin_password/$ADMIN_PASSWORD/g" setup-account.js
-    sed -i "s/__replica_user/$REPLICA_USER/g" setup-account.js
-    sed -i "s/__replica_password/$REPLICA_PASSWORD/g" setup-account.js
+    sed -i "s/__database_name/$DATABASE_NAME/g" /data-777/etc/setup-account.js
+    sed -i "s/__admin_user/$ADMIN_USER/g" /data-777/etc/setup-account.js
+    sed -i "s/__admin_password/$ADMIN_PASSWORD/g" /data-777/etc/setup-account.js
+    sed -i "s/__replica_user/$REPLICA_USER/g" /data-777/etc/setup-account.js
+    sed -i "s/__replica_password/$REPLICA_PASSWORD/g" /data-777/etc/setup-account.js
   gen-keyfile.sh: openssl rand -base64 741 > mongo-keyfile
   mongo-keyfile: |
     Czt2J5bzM3J0D/rnJar0EP1zSsABuzS7JRbfa+x64S0HVCxBYKLAkb3ZDO3Z9UNx
@@ -219,7 +222,7 @@ spec:
           mountPath: /data/bin
         - name: mongodb-data
           mountPath: /data/db
-        command: ["sleep", "3000"]
+        command: ["/data/bin/start.sh"]
         env:
           - name: ADMIN_USER
             valueFrom:
